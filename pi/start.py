@@ -27,9 +27,7 @@ num_pixels = 24
 # For RGBW NeoPixels, simply change the ORDER to RGBW or GRBW.
 ORDER = neopixel.RGBW
 
-pixels = neopixel.NeoPixel(
-    pixel_pin, num_pixels, brightness=0.5, auto_write=False, pixel_order=ORDER
-)
+pixels = neopixel.NeoPixel(pixel_pin, num_pixels, brightness=0.5, pixel_order=ORDER)
 
 mylcd = I2C_LCD_driver.lcd()
 
