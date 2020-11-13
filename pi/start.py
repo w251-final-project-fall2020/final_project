@@ -1,5 +1,7 @@
 import sys
 import time
+import board
+import neopixel
 
 import RPi.GPIO as GPIO
 from hx711 import HX711
@@ -14,6 +16,20 @@ LOCAL_MQTT_TOPIC = "weight_detection"
 THRESHOLD = 20
 
 detect_flag = False
+
+# On a Raspberry pi, use this instead, not all pins are supported
+pixel_pin = board.D12
+
+# The number of NeoPixels
+num_pixels = 24
+
+# The order of the pixel colors - RGB or GRB. Some NeoPixels have red and green reversed!
+# For RGBW NeoPixels, simply change the ORDER to RGBW or GRBW.
+ORDER = neopixel.RGBW
+
+pixels = neopixel.NeoPixel(
+    pixel_pin, num_pixels, brightness=0.5, auto_write=False, pixel_order=ORDER
+)
 
 mylcd = I2C_LCD_driver.lcd()
 
@@ -47,6 +63,7 @@ while True:
             if val < THRESHOLD:
                 mylcd.lcd_clear()
                 mylcd.lcd_display_string("READY", 1)
+                pixels.fill((0, 0, 0, 0))
                 detect_flag = False
         
         else:
@@ -56,12 +73,17 @@ while True:
                 mylcd.lcd_clear()
                 mylcd.lcd_display_string("WEIGHT DETECTED", 1)
                 mylcd.lcd_display_string(formatted_val, 2)
-
+                pixels.fill((255, 255, 255, 255))
                 time.sleep(5)
 
-                mqttclient = mqtt.Client()
-                mqttclient.connect(LOCAL_MQTT_HOST, LOCAL_MQTT_PORT, 60)
-                mqttclient.publish(LOCAL_MQTT_TOPIC, payload=val, qos=0, retain=False)
+                val = scale.getMeasure()
+
+                try:
+                    mqttclient = mqtt.Client()
+                    mqttclient.connect(LOCAL_MQTT_HOST, LOCAL_MQTT_PORT, 60)
+                    mqttclient.publish(LOCAL_MQTT_TOPIC, payload=val, qos=0, retain=False)
+                except:
+                    pass
 
                 detect_flag = True
                 
