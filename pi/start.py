@@ -7,6 +7,14 @@ from scale import Scale
 
 import I2C_LCD_driver
 
+
+LOCAL_MQTT_HOST = "192.168.0.174"
+LOCAL_MQTT_PORT = 1883
+LOCAL_MQTT_TOPIC = "weight_detection"
+THRESHOLD = 20
+
+detect_flag = False
+
 mylcd = I2C_LCD_driver.lcd()
 
 # choose pins on rpi (BCM5 and BCM6)
@@ -23,16 +31,37 @@ scale = Scale(source=hx)
 scale.setReferenceUnit(108)
 
 scale.reset()
+mylcd.lcd_display_string("TARING...", 1)
 scale.tare()
+mylcd.lcd_display_string("READY", 1)
 
 while True:
+
     time.sleep(0.5)
+
     try:
         val = scale.getMeasure()
-        formatted_val = "{0: 4.4f}".format(val)
-        mylcd.lcd_display_string(formatted_val, 1)
-        print(formatted_val)
+
+        if detect_flag:
+            if val < THRESHOLD:
+                mylcd.lcd_display_string("READY", 1)
+                detect_flag = False
         
+        else:
+            if val > THRESHOLD:
+
+                formatted_val = "{0: 4.4f}".format(val)
+                mylcd.lcd_display_string("WEIGHT DETECTED", 1)
+
+                time.sleep(5)
+
+                mqttclient = mqtt.Client()
+                mqttclient.connect(LOCAL_MQTT_HOST, LOCAL_MQTT_PORT, 60)
+                mqttclient.publish(LOCAL_MQTT_TOPIC, payload=val, qos=0, retain=False)
+
+                detect_flag = True
+                
+            
     except (KeyboardInterrupt, SystemExit):
         GPIO.cleanup()
         sys.exit()
