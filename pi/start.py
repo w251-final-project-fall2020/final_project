@@ -31,6 +31,7 @@ while True:
         val = scale.getMeasure()
         formatted_val = "{0: 4.4f}".format(val)
         mylcd.lcd_display_string(formatted_val, 1)
+        print(formatted_val)
         
     except (KeyboardInterrupt, SystemExit):
         GPIO.cleanup()
