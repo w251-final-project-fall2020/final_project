@@ -55,6 +55,7 @@ while True:
                 formatted_val = "{0: 4.4f}".format(val)
                 mylcd.lcd_clear()
                 mylcd.lcd_display_string("WEIGHT DETECTED", 1)
+                mylcd.lcd_display_string(formatted_val, 2)
 
                 time.sleep(5)
 
