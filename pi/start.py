@@ -6,7 +6,7 @@ from hx711 import HX711
 from scale import Scale
 
 import I2C_LCD_driver
-
+import paho.mqtt.client as mqtt
 
 LOCAL_MQTT_HOST = "192.168.0.174"
 LOCAL_MQTT_PORT = 1883
@@ -33,6 +33,7 @@ scale.setReferenceUnit(108)
 scale.reset()
 mylcd.lcd_display_string("TARING...", 1)
 scale.tare()
+mylcd.lcd_clear()
 mylcd.lcd_display_string("READY", 1)
 
 while True:
@@ -44,6 +45,7 @@ while True:
 
         if detect_flag:
             if val < THRESHOLD:
+                mylcd.lcd_clear()
                 mylcd.lcd_display_string("READY", 1)
                 detect_flag = False
         
@@ -51,6 +53,7 @@ while True:
             if val > THRESHOLD:
 
                 formatted_val = "{0: 4.4f}".format(val)
+                mylcd.lcd_clear()
                 mylcd.lcd_display_string("WEIGHT DETECTED", 1)
 
                 time.sleep(5)
