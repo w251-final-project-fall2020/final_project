@@ -112,12 +112,13 @@ def detect(weight, save_img=False):
 
             # Cut out image and send msg
             for *xyxy, conf, cls in reversed(det):
-                label = '%s %.2f' % (names[int(cls)], conf)
+                label = names[int(cls)]
+                confidence = '%.2f' % (conf)
                 xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                 x,y,w,h = xywh
                 crop_img = img0[y:y+h, x:x+w]
                 rc, png = cv2.imencode('.png', crop_img)
-                send_detected_image(label, weight, png.tostring())
+                send_detected_image(label, confidence, weight, png.tostring())
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
@@ -167,9 +168,9 @@ def on_connect_local(client, userdata, flags, rc):
     print("connected to local broker with rc: " + str(rc))
     client.subscribe(LOCAL_MQTT_TOPIC)
 
-def send_detected_image(label, weight, png_string, DELIM=','):
+def send_detected_image(label, confidence, weight, png_string, DELIM=','):
 
-    msg = label + DELIM + weight + DELIM + png_string
+    msg = DELIM.join([label, confidence, weight, png_string])
 
     remote_mqttclient = mqtt.Client()
     remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
