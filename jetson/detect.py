@@ -114,11 +114,11 @@ def detect(weight, save_img=False):
             for *xyxy, conf, cls in reversed(det):
                 label = names[int(cls)]
                 confidence = '%.2f' % (conf)
-                xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                x,y,w,h = xywh
-                crop_img = img0[y:y+h, x:x+w]
-                rc, png = cv2.imencode('.png', crop_img)
-                send_detected_image(label, confidence, weight, png.tostring())
+                x1, x2, y1, y2 = [int(coord) for coord in xyxy]
+                crop_img = im0[y1:y2, x1:x2]
+                rc, png = cv2.imencode('.png', crop_img) #png is binary here
+                #todo - figure out how to send str data and binary image
+                send_detected_image(label, confidence, weight, "image_here")
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
