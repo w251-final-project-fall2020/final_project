@@ -14,7 +14,17 @@ from utils.general import check_img_size, non_max_suppression, apply_classifier,
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized
 
-def detect(save_img=False):
+import paho.mqtt.client as mqtt
+
+LOCAL_MQTT_HOST='mosquitto'
+LOCAL_MQTT_PORT=1883
+LOCAL_MQTT_TOPIC='weight_detection'
+
+REMOTE_MQTT_HOST='ec2-18-237-58-254.us-west-2.compute.amazonaws.com'
+REMOTE_MQTT_PORT=1883
+REMOTE_MQTT_TOPIC='cloud'
+
+def detect(weight, save_img=False):
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
@@ -107,8 +117,7 @@ def detect(save_img=False):
                 x,y,w,h = xywh
                 crop_img = img0[y:y+h, x:x+w]
                 rc, png = cv2.imencode('.png', crop_img)
-                msg = label + ',' + png.tostring()
-                print(msg)
+                send_detected_image(label, weight, png.tostring())
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
@@ -154,6 +163,31 @@ def detect(save_img=False):
     print('Done. (%.3fs)' % (time.time() - t0))
 
 
+def on_connect_local(client, userdata, flags, rc):
+    print("connected to local broker with rc: " + str(rc))
+    client.subscribe(LOCAL_MQTT_TOPIC)
+
+def send_detected_image(label, weight, png_string, DELIM=','):
+
+    msg = label + DELIM + weight + DELIM + png_string
+
+    remote_mqttclient = mqtt.Client()
+    remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
+    remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg, qos=0, retain=False)
+
+def on_message(client, userdata, msg):
+    try:
+        print("message received!")
+        # if we wanted to re-publish this message, something like this should work
+
+        weight = str(msg.payload)
+
+        with torch.no_grad():
+            detect(weight)
+
+    except:
+        print("Unexpected error:", sys.exc_info()[0])
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
@@ -175,10 +209,12 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     print(opt)
 
-    with torch.no_grad():
-        if opt.update:  # update all models (to fix SourceChangeWarning)
-            for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
-                detect()
-                strip_optimizer(opt.weights)
-        else:
-            detect()
+    local_mqttclient = mqtt.Client()
+    local_mqttclient.on_connect = on_connect_local
+    local_mqttclient.connect(LOCAL_MQTT_HOST, LOCAL_MQTT_PORT, 60)
+    local_mqttclient.on_message = on_message
+
+    # go into a loop
+    local_mqttclient.loop_forever()
+
+   
