@@ -1,3 +1,5 @@
+# Dataset utils and dataloaders
+
 import glob
 import math
 import os
@@ -16,8 +18,10 @@ from PIL import Image, ExifTags
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from utils.general import xyxy2xywh, xywh2xyxy, torch_distributed_zero_first
+from utils.general import xyxy2xywh, xywh2xyxy
+from utils.torch_utils import torch_distributed_zero_first
 
+# Parameters
 help_url = 'https://github.com/ultralytics/yolov5/wiki/Train-Custom-Data'
 img_formats = ['.bmp', '.jpg', '.jpeg', '.png', '.tif', '.tiff', '.dng']
 vid_formats = ['.mov', '.avi', '.mp4', '.mpg', '.mpeg', '.m4v', '.wmv', '.mkv']
@@ -50,7 +54,7 @@ def exif_size(img):
 
 def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=False, cache=False, pad=0.0, rect=False,
                       rank=-1, world_size=1, workers=8):
-    # Make sure only the first process in DDP process the dataset first, and the following others can use the cache.
+    # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     with torch_distributed_zero_first(rank):
         dataset = LoadImagesAndLabels(path, imgsz, batch_size,
                                       augment=augment,  # augment images
@@ -73,37 +77,11 @@ def create_dataloader(path, imgsz, batch_size, stride, opt, hyp=None, augment=Fa
                                     collate_fn=LoadImagesAndLabels.collate_fn)  # torch.utils.data.DataLoader()
     return dataloader, dataset
 
-def gstreamer_pipeline(
-    capture_width=1280,
-    capture_height=720,
-    display_width=1280,
-    display_height=720,
-    framerate=60,
-    flip_method=0,
-):
-    return (
-        "nvarguscamerasrc ! "
-        "video/x-raw(memory:NVMM), "
-        "width=(int)%d, height=(int)%d, "
-        "format=(string)NV12, framerate=(fraction)%d/1 ! "
-        "nvvidconv flip-method=%d ! "
-        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
-        "videoconvert ! "
-        "video/x-raw, format=(string)BGR ! appsink"
-        % (
-            capture_width,
-            capture_height,
-            framerate,
-            flip_method,
-            display_width,
-            display_height,
-        )
-    )
 
 class InfiniteDataLoader(torch.utils.data.dataloader.DataLoader):
-    """ Dataloader that reuses workers.
+    """ Dataloader that reuses workers
 
-    Uses same syntax as vanilla DataLoader.
+    Uses same syntax as vanilla DataLoader
     """
 
     def __init__(self, *args, **kwargs):
@@ -120,7 +98,7 @@ class InfiniteDataLoader(torch.utils.data.dataloader.DataLoader):
 
 
 class _RepeatSampler(object):
-    """ Sampler that repeats forever.
+    """ Sampler that repeats forever
 
     Args:
         sampler (Sampler)
@@ -203,7 +181,6 @@ class LoadImages:  # for inference
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
 
-        # cv2.imwrite(path + '.letterbox.jpg', 255 * img.transpose((1, 2, 0))[:, :, ::-1])  # save letterbox image
         return path, img, img0, self.cap
 
     def new_video(self, path):
@@ -216,25 +193,17 @@ class LoadImages:  # for inference
 
 
 class LoadWebcam:  # for inference
-    def __init__(self, pipe=0, img_size=640):
+    def __init__(self, pipe='0', img_size=640):
         self.img_size = img_size
 
-        if pipe == '0':
-            pipe = 0  # local camera
+        if pipe.isnumeric():
+            pipe = eval(pipe)  # local camera
         # pipe = 'rtsp://192.168.1.64/1'  # IP camera
         # pipe = 'rtsp://username:password@192.168.1.64/1'  # IP camera with login
-        # pipe = 'rtsp://170.93.143.139/rtplive/470011e600ef003a004ee33696235daa'  # IP traffic camera
         # pipe = 'http://wmccpinetop.axiscam.net/mjpg/video.mjpg'  # IP golf camera
 
-        # https://answers.opencv.org/question/215996/changing-gstreamer-pipeline-to-opencv-in-pythonsolved/
-        # pipe = '"rtspsrc location="rtsp://username:password@192.168.1.64/1" latency=10 ! appsink'  # GStreamer
-
-        # https://answers.opencv.org/question/200787/video-acceleration-gstremer-pipeline-in-videocapture/
-        # https://stackoverflow.com/questions/54095699/install-gstreamer-support-for-opencv-python-package  # install help
-        # pipe = "rtspsrc location=rtsp://root:root@192.168.0.91:554/axis-media/media.amp?videocodec=h264&resolution=3840x2160 protocols=GST_RTSP_LOWER_TRANS_TCP ! rtph264depay ! queue ! vaapih264dec ! videoconvert ! appsink"  # GStreamer
-
         self.pipe = pipe
-        self.cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
+        self.cap = cv2.VideoCapture(pipe)  # video capture object
         self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # set buffer size
 
     def __iter__(self):
@@ -297,7 +266,7 @@ class LoadStreams:  # multiple IP or RTSP cameras
         for i, s in enumerate(sources):
             # Start the thread to read frames from the video stream
             print('%g/%g: %s... ' % (i + 1, n, s), end='')
-            cap = cv2.VideoCapture(gstreamer_pipeline(flip_method=0), cv2.CAP_GSTREAMER)
+            cap = cv2.VideoCapture(eval(s) if s.isnumeric() else s)
             assert cap.isOpened(), 'Failed to open %s' % s
             w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
             h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -919,52 +888,6 @@ def cutout(image, labels):
             labels = labels[ioa < 0.60]  # remove >60% obscured labels
 
     return labels
-
-
-def reduce_img_size(path='path/images', img_size=1024):  # from utils.datasets import *; reduce_img_size()
-    # creates a new ./images_reduced folder with reduced size images of maximum size img_size
-    path_new = path + '_reduced'  # reduced images path
-    create_folder(path_new)
-    for f in tqdm(glob.glob('%s/*.*' % path)):
-        try:
-            img = cv2.imread(f)
-            h, w = img.shape[:2]
-            r = img_size / max(h, w)  # size ratio
-            if r < 1.0:
-                img = cv2.resize(img, (int(w * r), int(h * r)), interpolation=cv2.INTER_AREA)  # _LINEAR fastest
-            fnew = f.replace(path, path_new)  # .replace(Path(f).suffix, '.jpg')
-            cv2.imwrite(fnew, img)
-        except:
-            print('WARNING: image failure %s' % f)
-
-
-def recursive_dataset2bmp(dataset='path/dataset_bmp'):  # from utils.datasets import *; recursive_dataset2bmp()
-    # Converts dataset to bmp (for faster training)
-    formats = [x.lower() for x in img_formats] + [x.upper() for x in img_formats]
-    for a, b, files in os.walk(dataset):
-        for file in tqdm(files, desc=a):
-            p = a + '/' + file
-            s = Path(file).suffix
-            if s == '.txt':  # replace text
-                with open(p, 'r') as f:
-                    lines = f.read()
-                for f in formats:
-                    lines = lines.replace(f, '.bmp')
-                with open(p, 'w') as f:
-                    f.write(lines)
-            elif s in formats:  # replace image
-                cv2.imwrite(p.replace(s, '.bmp'), cv2.imread(p))
-                if s != '.bmp':
-                    os.system("rm '%s'" % p)
-
-
-def imagelist2folder(path='path/images.txt'):  # from utils.datasets import *; imagelist2folder()
-    # Copies all the images in a text file (list of images) into a folder
-    create_folder(path[:-4])
-    with open(path, 'r') as f:
-        for line in f.read().splitlines():
-            os.system('cp "%s" %s' % (line, path[:-4]))
-            print(line)
 
 
 def create_folder(path='./new'):

@@ -16,7 +16,6 @@ WORKDIR /usr/src/app/yolov5
 # Install dependencies (pip or conda)
 #RUN pip install -r requirements.txt
 
-
 RUN apt update && apt install -y libffi-dev python3-pip curl unzip python3-tk libopencv-dev python3-opencv 
 RUN pip3 install -U gsutil pyyaml tqdm cython torchvision paho-mqtt   
 RUN apt install -y python3-scipy python3-matplotlib python3-numpy
