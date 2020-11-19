@@ -7,6 +7,8 @@ import torch
 import torch.backends.cudnn as cudnn
 from numpy import random
 
+from datetime import datetime
+
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages
 from utils.general import check_img_size, non_max_suppression, apply_classifier, scale_coords, xyxy2xywh, \
@@ -16,13 +18,12 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 import paho.mqtt.client as mqtt
 
+import boto3
+from io import BytesIO
+
 LOCAL_MQTT_HOST='mosquitto'
 LOCAL_MQTT_PORT=1883
 LOCAL_MQTT_TOPIC='weight_detection'
-
-REMOTE_MQTT_HOST='ec2-18-237-58-254.us-west-2.compute.amazonaws.com'
-REMOTE_MQTT_PORT=1883
-REMOTE_MQTT_TOPIC='cloud'
 
 def detect(weight, save_img=False):
     source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
@@ -63,18 +64,7 @@ def detect(weight, save_img=False):
     # Get names and colors
     names = model.module.names if hasattr(model, 'module') else model.names
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
-
-    # Run inference
-    t0 = time.time()
-    img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
-    _ = model(img.half() if half else img) if device.type != 'cpu' else None  # run once
-
-    path, img, im0s, vid_cap = next(dataset)
-    
-    img = torch.from_numpy(img).to(device)
-    img = img.half() if half else img.float()  # uint8 to fp16/32
-    img /= 255.0  # 0 - 255 to 0.0 - 1.0
-    if img.ndimension() == 3:
+datetime.now()
         img = img.unsqueeze(0)
 
     # Inference
@@ -89,6 +79,9 @@ def detect(weight, save_img=False):
     if classify:
         pred = apply_classifier(pred, modelc, img, im0s)
 
+    # Total detections
+    num_items = len(pred)
+
     # Process detections
     for i, det in enumerate(pred):  # detections per image
         if webcam:  # batch_size >= 1
@@ -98,6 +91,8 @@ def detect(weight, save_img=False):
 
         #save_path = str(save_dir / p.name)
         #txt_path = str(save_dir / 'labels' / p.stem) + ('_%g' % dataset.frame if dataset.mode == 'video' else '')
+
+        save_timestamp = str(datetime.now())
         
         s += '%gx%g ' % img.shape[2:]  # print string
         gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
@@ -117,8 +112,8 @@ def detect(weight, save_img=False):
                 x1, x2, y1, y2 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
                 rc, png = cv2.imencode('.png', crop_img) #png is binary here
-                #todo - figure out how to send str data and binary image
-                send_detected_image(label, confidence, weight, "image_here")
+
+                save_detected_image(png, save_timestamp, i, num_items, label, confidence, weight)
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
@@ -168,13 +163,35 @@ def on_connect_local(client, userdata, flags, rc):
     print("connected to local broker with rc: " + str(rc))
     client.subscribe(LOCAL_MQTT_TOPIC)
 
-def send_detected_image(label, confidence, weight, png_string, DELIM=','):
+def save_detected_image(image, save_timestamp, index, num_items, label, confidence, weight):
 
-    msg = DELIM.join([label, confidence, weight, png_string])
+    bucket = boto3.resource('s3').Bucket('food-detector-w251')
 
-    remote_mqttclient = mqtt.Client()
-    remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
-    remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg, qos=0, retain=False)
+    stream = BytesIO(image.tobytes())
+    stream.seek(0) # rewind pointer back to start
+
+    filename = save_timestamp + '_' + index + '.png'
+
+    bucket.put_object(
+        Key=filename,
+        Body=stream,
+        ContentType='image/png',
+    )
+
+    dynamodb = boto3.client("dynamodb")
+
+    response = dynamodb.put_item(
+        TableName='food-detector', 
+        Item={
+            "label": label,
+            "confidence": confidence,
+            "total_items": num_items,
+            "total_weight": weight,
+            "image_filepath": filename,
+            "save_timestamp": save_timestamp
+        }
+    )
+
 
 def on_message(client, userdata, msg):
     try:
