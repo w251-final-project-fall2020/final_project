@@ -194,7 +194,7 @@ def plot_lr_scheduler(optimizer, scheduler, epochs=300, save_dir=''):
     plt.xlim(0, epochs)
     plt.ylim(0)
     plt.tight_layout()
-    plt.savefig(Path(save_dir) / 'LR.png', dpi=200)
+    plt.savefig(str(save_dir / 'LR.png'), dpi=200)
 
 
 def plot_test_txt():  # from utils.general import *; plot_test()
@@ -274,7 +274,7 @@ def plot_labels(labels, save_dir=''):
     ax[2].scatter(b[2], b[3], c=hist2d(b[2], b[3], 90), cmap='jet')
     ax[2].set_xlabel('width')
     ax[2].set_ylabel('height')
-    plt.savefig(Path(save_dir) / 'labels.png', dpi=200)
+    plt.savefig(str(save_dir / 'labels.png'), dpi=200)
     plt.close()
 
     # seaborn correlogram
@@ -285,7 +285,7 @@ def plot_labels(labels, save_dir=''):
         sns.pairplot(x, corner=True, diag_kind='hist', kind='scatter', markers='o',
                      plot_kws=dict(s=3, edgecolor=None, linewidth=1, alpha=0.02),
                      diag_kws=dict(bins=50))
-        plt.savefig(Path(save_dir) / 'labels_correlogram.png', dpi=200)
+        plt.savefig(str(save_dir / 'labels_correlogram.png'), dpi=200)
         plt.close()
     except Exception as e:
         pass
@@ -374,4 +374,4 @@ def plot_results(start=0, stop=0, bucket='', id=(), labels=(), save_dir=''):
 
     fig.tight_layout()
     ax[1].legend()
-    fig.savefig(Path(save_dir) / 'results.png', dpi=200)
+    fig.savefig(str(save_dir / 'results.png'), dpi=200)
