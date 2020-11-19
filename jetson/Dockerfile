@@ -8,7 +8,7 @@ RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
 
 # Copy contents
-#COPY . /usr/src/app
+COPY . /usr/src/app
 #RUN git clone https://github.com/ultralytics/yolov5
 #WORKDIR /usr/src/app/yolov5
 
