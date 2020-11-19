@@ -1,0 +1,12 @@
+../coco/images/train2020/apples1.jpg
+../coco/images/train2020/apples2.jpg
+../coco/images/train2020/apples.jpg
+../coco/images/train2020/banana1.jpg
+../coco/images/train2020/banana3.jpg
+../coco/images/train2020/capsicum.jpg
+../coco/images/train2020/lemon1.jpg
+../coco/images/train2020/lemon.jpg
+../coco/images/train2020/orange.jpg
+../coco/images/train2020/pear.jpg
+
+
