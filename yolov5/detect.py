@@ -5,6 +5,7 @@ from pathlib import Path
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
+import numpy as np
 from numpy import random
 
 from datetime import datetime
@@ -29,6 +30,8 @@ half = device.type != 'cpu'
 model = None
 dataset = None
 names = None
+
+DELIMITER = ','
 
 def initialize():
     global model, dataset, names
@@ -102,14 +105,15 @@ def detect(weight, save_img=False):
 
             # Cut out image and send msg
             for *xyxy, conf, cls in reversed(det):
+                
                 label = names[int(cls)]
                 confidence = '%.2f' % (conf)
-                print(im0)
-                x1, x2, y1, y2 = [int(coord) for coord in xyxy]
+
+                x2, x1, y2, y1 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
-                #rc, png = cv2.imencode('.png', crop_img) #png is binary here
-                print(crop_img, num_items, label, confidence, weight)
-                #save_detected_image(png, save_timestamp, i, num_items, label, confidence, weight)
+                crop_img_str = np.array2string(crop_img)
+
+                save_detected_image(crop_img_str, save_timestamp, i, num_items, label, confidence, weight)
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
@@ -160,8 +164,8 @@ def on_connect_local(client, userdata, flags, rc):
     client.subscribe(LOCAL_MQTT_TOPIC)
 
 def save_detected_image(image, save_timestamp, index, num_items, label, confidence, weight):
-    pass
-
+    msg = DELIMITER.join([image, save_timestamp, index, num_items, label, confidence, weight])
+    print(msg)
 
 def on_message(client, userdata, msg):
     try:
