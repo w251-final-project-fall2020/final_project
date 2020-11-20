@@ -1,3 +1,4 @@
+import sys
 import argparse
 import time
 from pathlib import Path
@@ -5,6 +6,7 @@ from pathlib import Path
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
+import numpy as np
 from numpy import random
 
 from datetime import datetime
@@ -18,26 +20,31 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 import paho.mqtt.client as mqtt
 
-import boto3
-from io import BytesIO
-
 LOCAL_MQTT_HOST='mosquitto'
 LOCAL_MQTT_PORT=1883
 LOCAL_MQTT_TOPIC='weight_detection'
 
-def detect(weight, save_img=False):
-    source, weights, view_img, save_txt, imgsz = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size
-    webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
-        ('rtsp://', 'rtmp://', 'http://'))
+REMOTE_MQTT_HOST='ec2-18-237-58-254.us-west-2.compute.amazonaws.com'
+REMOTE_MQTT_PORT=1883
+REMOTE_MQTT_TOPIC='food_detector_cloud'
 
-    # Directories
-    save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+source = '0'
+device = select_device('')
+half = device.type != 'cpu'
 
+model = None
+dataset = None
+names = None
+
+DELIMITER = ','
+
+def initialize():
+    global model, dataset, names
+
+    weights, view_img, imgsz = opt.weights, opt.view_img, opt.img_size
+       
     # Initialize
     set_logging()
-    device = select_device(opt.device)
-    half = device.type != 'cpu'  # half precision only supported on CUDA
 
     # Load model
     model = attempt_load(weights, map_location=device)  # load FP32 model
@@ -45,25 +52,18 @@ def detect(weight, save_img=False):
     if half:
         model.half()  # to FP16
 
-    # Second-stage classifier
-    classify = False
-    if classify:
-        modelc = load_classifier(name='resnet101', n=2)  # initialize
-        modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model']).to(device).eval()
-
     # Set Dataloader
     vid_path, vid_writer = None, None
-    if webcam:
-        view_img = True
-        cudnn.benchmark = True  # set True to speed up constant image size inference
-        dataset = LoadStreams(source, img_size=imgsz)
-    else:
-        save_img = True
-        dataset = LoadImages(source, img_size=imgsz)
+    view_img = True
+    cudnn.benchmark = True  # set True to speed up constant image size inference
+    dataset = LoadStreams(source, img_size=imgsz)
 
     # Get names and colors
     names = model.module.names if hasattr(model, 'module') else model.names
-    colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
+
+def detect(weight, save_img=False):
+    
+    weights, view_img, imgsz = opt.weights, opt.view_img, opt.img_size
 
     # Run inference
     t0 = time.time()
@@ -85,19 +85,12 @@ def detect(weight, save_img=False):
     pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
     t2 = time_synchronized()
 
-    # Apply Classifier
-    if classify:
-        pred = apply_classifier(pred, modelc, img, im0s)
-
     # Total detections
     num_items = len(pred)
 
     # Process detections
     for i, det in enumerate(pred):  # detections per image
-        if webcam:  # batch_size >= 1
-            p, s, im0 = Path(path[i]), '%g: ' % i, im0s[i].copy()
-        else:
-            p, s, im0 = Path(path), '', im0s
+        p, s, im0 = Path(path[i]), '%g: ' % i, im0s[i].copy()
 
         #save_path = str(save_dir / p.name)
         #txt_path = str(save_dir / 'labels' / p.stem) + ('_%g' % dataset.frame if dataset.mode == 'video' else '')
@@ -117,14 +110,24 @@ def detect(weight, save_img=False):
 
             # Cut out image and send msg
             for *xyxy, conf, cls in reversed(det):
+
                 label = names[int(cls)]
                 confidence = '%.2f' % (conf)
-                x1, x2, y1, y2 = [int(coord) for coord in xyxy]
+
+                print("%s detected with confidence %s" % (label, confidence))
+
+                x2, x1, y2, y1 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
-                rc, png = cv2.imencode('.png', crop_img) #png is binary here
-                print(crop_img, num_items, label, confidence, weight)
-                
-                #save_detected_image(png, save_timestamp, i, num_items, label, confidence, weight)
+                crop_img_str = np.array2string(crop_img)
+
+                save_detected_image(
+                    crop_img_str, 
+                    save_timestamp, 
+                    str(i), str(num_items), 
+                    label, 
+                    confidence, 
+                    weight
+                )
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
@@ -175,34 +178,13 @@ def on_connect_local(client, userdata, flags, rc):
     client.subscribe(LOCAL_MQTT_TOPIC)
 
 def save_detected_image(image, save_timestamp, index, num_items, label, confidence, weight):
-
-    bucket = boto3.resource('s3').Bucket('food-detector-w251')
-
-    stream = BytesIO(image.tobytes())
-    stream.seek(0) # rewind pointer back to start
-
-    filename = save_timestamp + '_' + index + '.png'
-
-    bucket.put_object(
-        Key=filename,
-        Body=stream,
-        ContentType='image/png',
-    )
-
-    dynamodb = boto3.client("dynamodb")
-
-    response = dynamodb.put_item(
-        TableName='food-detector', 
-        Item={
-            "label": label,
-            "confidence": confidence,
-            "total_items": num_items,
-            "total_weight": weight,
-            "image_filepath": filename,
-            "save_timestamp": save_timestamp
-        }
-    )
-
+    msg = DELIMITER.join([image, save_timestamp, index, num_items, label, confidence, weight])
+    try:
+        remote_mqttclient = mqtt.Client()
+        remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
+        remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg.payload, qos=0, retain=False)
+    except:
+        print("remote mqtt message sending failed\n")
 
 def on_message(client, userdata, msg):
     try:
@@ -237,6 +219,8 @@ if __name__ == '__main__':
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     opt = parser.parse_args()
     print(opt)
+
+    initialize()
 
     local_mqttclient = mqtt.Client()
     local_mqttclient.on_connect = on_connect_local
