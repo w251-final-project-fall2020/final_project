@@ -105,7 +105,7 @@ def detect(weight, save_img=False):
 
             # Cut out image and send msg
             for *xyxy, conf, cls in reversed(det):
-                
+
                 label = names[int(cls)]
                 confidence = '%.2f' % (conf)
 
@@ -113,7 +113,14 @@ def detect(weight, save_img=False):
                 crop_img = im0[y1:y2, x1:x2]
                 crop_img_str = np.array2string(crop_img)
 
-                save_detected_image(crop_img_str, save_timestamp, i, num_items, label, confidence, weight)
+                save_detected_image(
+                    crop_img_str, 
+                    save_timestamp, 
+                    str(i), str(num_items), 
+                    label, 
+                    confidence, 
+                    weight
+                )
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
