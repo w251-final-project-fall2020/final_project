@@ -18,14 +18,11 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized
 
 import paho.mqtt.client as mqtt
 
-import boto3
-from io import BytesIO
-
 LOCAL_MQTT_HOST='mosquitto'
 LOCAL_MQTT_PORT=1883
 LOCAL_MQTT_TOPIC='weight_detection'
 
-source = 0
+source = '0'
 device = select_device('')
 half = device.type != 'cpu'
 
@@ -36,7 +33,7 @@ names = None
 def initialize():
     global model, dataset, names
 
-    weights, view_img, save_txt, imgsz = opt.weights, opt.view_img, opt.img_size
+    weights, view_img, imgsz = opt.weights, opt.view_img, opt.img_size
        
     # Initialize
     set_logging()
@@ -80,8 +77,6 @@ def detect(weight, save_img=False):
     pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
     t2 = time_synchronized()
 
-    pred = apply_classifier(pred, modelc, img, im0s)
-
     # Total detections
     num_items = len(pred)
 
@@ -109,11 +104,11 @@ def detect(weight, save_img=False):
             for *xyxy, conf, cls in reversed(det):
                 label = names[int(cls)]
                 confidence = '%.2f' % (conf)
+                print(im0)
                 x1, x2, y1, y2 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
-                rc, png = cv2.imencode('.png', crop_img) #png is binary here
+                #rc, png = cv2.imencode('.png', crop_img) #png is binary here
                 print(crop_img, num_items, label, confidence, weight)
-                
                 #save_detected_image(png, save_timestamp, i, num_items, label, confidence, weight)
 
             # # Write results
