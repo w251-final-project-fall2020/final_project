@@ -64,7 +64,17 @@ def detect(weight, save_img=False):
     # Get names and colors
     names = model.module.names if hasattr(model, 'module') else model.names
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
-datetime.now()
+
+    # Run inference
+    t0 = time.time()
+    img = torch.zeros((1, 3, imgsz, imgsz), device=device)  # init img
+    _ = model(img.half() if half else img) if device.type != 'cpu' else None  # run once
+
+    path, img, im0s, vid_cap = next(dataset)
+    img = torch.from_numpy(img).to(device)
+    img = img.half() if half else img.float()  # uint8 to fp16/32
+    img /= 255.0  # 0 - 255 to 0.0 - 1.0
+    if img.ndimension() == 3:
         img = img.unsqueeze(0)
 
     # Inference
@@ -112,8 +122,9 @@ datetime.now()
                 x1, x2, y1, y2 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
                 rc, png = cv2.imencode('.png', crop_img) #png is binary here
-
-                save_detected_image(png, save_timestamp, i, num_items, label, confidence, weight)
+                print(crop_img, num_items, label, confidence, weight)
+                
+                #save_detected_image(png, save_timestamp, i, num_items, label, confidence, weight)
 
             # # Write results
             # for *xyxy, conf, cls in reversed(det):
