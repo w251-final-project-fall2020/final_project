@@ -1,3 +1,4 @@
+import sys
 import argparse
 import time
 from pathlib import Path
@@ -22,6 +23,10 @@ import paho.mqtt.client as mqtt
 LOCAL_MQTT_HOST='mosquitto'
 LOCAL_MQTT_PORT=1883
 LOCAL_MQTT_TOPIC='weight_detection'
+
+REMOTE_MQTT_HOST='ec2-18-237-58-254.us-west-2.compute.amazonaws.com'
+REMOTE_MQTT_PORT=1883
+REMOTE_MQTT_TOPIC='food_detector_cloud'
 
 source = '0'
 device = select_device('')
@@ -109,6 +114,8 @@ def detect(weight, save_img=False):
                 label = names[int(cls)]
                 confidence = '%.2f' % (conf)
 
+                print("%s detected with confidence %s" % (label, confidence))
+
                 x2, x1, y2, y1 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
                 crop_img_str = np.array2string(crop_img)
@@ -172,7 +179,9 @@ def on_connect_local(client, userdata, flags, rc):
 
 def save_detected_image(image, save_timestamp, index, num_items, label, confidence, weight):
     msg = DELIMITER.join([image, save_timestamp, index, num_items, label, confidence, weight])
-    print(msg)
+    remote_mqttclient = mqtt.Client()
+    remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
+    remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg.payload, qos=0, retain=False)
 
 def on_message(client, userdata, msg):
     try:
