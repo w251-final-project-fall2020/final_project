@@ -179,9 +179,12 @@ def on_connect_local(client, userdata, flags, rc):
 
 def save_detected_image(image, save_timestamp, index, num_items, label, confidence, weight):
     msg = DELIMITER.join([image, save_timestamp, index, num_items, label, confidence, weight])
-    remote_mqttclient = mqtt.Client()
-    remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
-    remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg.payload, qos=0, retain=False)
+    try:
+        remote_mqttclient = mqtt.Client()
+        remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
+        remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg.payload, qos=0, retain=False)
+    except:
+        print("remote mqtt message sending failed\n")
 
 def on_message(client, userdata, msg):
     try:
