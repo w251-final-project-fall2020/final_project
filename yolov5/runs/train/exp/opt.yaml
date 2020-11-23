@@ -1,9 +1,9 @@
-weights: yolov5s.pt
-cfg: ''
+weights: ./weights/yolov5s.pt
+cfg: ./models/yolov5s.yaml
 data: ./data/coco-mids.yaml
 hyp: data/hyp.scratch.yaml
 epochs: 5
-batch_size: 16
+batch_size: 8
 img_size:
 - 640
 - 640
@@ -27,7 +27,7 @@ workers: 8
 project: runs/train
 name: exp
 exist_ok: false
-total_batch_size: 16
+total_batch_size: 8
 world_size: 1
 global_rank: -1
 save_dir: runs/train/exp
