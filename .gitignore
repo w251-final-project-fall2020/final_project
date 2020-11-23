@@ -1,0 +1,5 @@
+yolov5/__pycache__/
+yolov5/models/__pycache__/
+yolov5/utils/__pycache__/
+yolov5/weights/yolov5l.pt
+yolov5/weights/yolov5m.pt
