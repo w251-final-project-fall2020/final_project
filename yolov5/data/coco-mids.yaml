@@ -6,11 +6,13 @@
 #     /yolov5
 
 # train and val data as 1) directory: path/images/, 2) file: path/images.txt, or 3) list: [path1/images/, path2/images/]
+#train: ../coco-mids/images/train2020/  # 8 images
+#val: ../coco-mids/images/train2020/  # 8images
 train: ../coco-mids/images/train2020/  # 8 images
-val: ../coco-mids/images/train2020/  # 8images
+val: ../coco-mids/images/val2020/  # 8images
 
 # number of classes
-nc: 10
+nc: 6
 
 # class names
-names: ['banana', 'rotten-banana', 'apple', 'rotten-apple', 'orange', 'rotten-orange', 'broccoli', 'rotten-broccoli', 'carrot', 'rotten-carrot']
+names: ['apple', 'rotten-apple', 'banana', 'rotten-banana', 'orange', 'rotten-orange']
