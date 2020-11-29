@@ -117,8 +117,8 @@ def detect(weight, save_img=False):
                 confidence = '%.2f' % (conf)
 
                 print("%s detected with confidence %s" % (label, confidence))
-
-                x2, x1, y2, y1 = [int(coord) for coord in xyxy]
+                
+                x1, y1, x2, y2 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
                 rc, png = cv2.imencode('.png', crop_img)
                 image_bytes = png.tobytes()
