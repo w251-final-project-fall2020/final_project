@@ -16,12 +16,12 @@ bucket = boto3.resource('s3').Bucket('food-detector')
 dynamodb = boto3.client("dynamodb")
 
 def extractData(payload):
-  image_str, save_timestamp, index, num_items, label, confidence, weight = payload.decode('utf-8').split(',')
-  print(image_str)
-  image_arr = eval('np.array(' + image_str + ')')
-  image_bytes = Image.fromarray(image_arr, 'RGB').tobytes()
-  return image_bytes, save_timestamp, index, num_items, label, confidence, weight
-  
+  data = payload.split(b';')
+  image = data[0]
+
+  save_timestamp, index, num_items, label, confidence, weight = [d.decode('utf-8') for d in data[1:]]
+
+  return image, save_timestamp, index, num_items, label, confidence, weight
 
 def on_connect_local(client, userdata, flags, rc):
   print("connected to local broker with rc: " + str(rc))
