@@ -117,17 +117,31 @@ def detect(weight, save_img=False):
                 confidence = '%.2f' % (conf)
 
                 print("%s detected with confidence %s" % (label, confidence))
-                
+
                 x1, y1, x2, y2 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
-                rc, png = cv2.imencode('.png', crop_img)
+
+                #percent by which the image is resized
+                scale_percent = 20
+
+                #calculate the 50 percent of original dimensions
+                width = int(crop_img.shape[1] * scale_percent / 100)
+                height = int(crop_img.shape[0] * scale_percent / 100)
+
+                # dsize
+                dsize = (width, height)
+
+                # resize image
+                output = cv2.resize(crop_img, dsize)
+
+                rc, png = cv2.imencode('.png', output)
                 image_bytes = png.tobytes()
 
                 save_detected_image(
-                    image_bytes, 
-                    save_timestamp, 
+                    image_bytes,
+                    save_timestamp,
                     str(i), str(num_items), 
-                    label, 
+                    label,
                     confidence, 
                     weight
                 )
@@ -192,10 +206,12 @@ def save_detected_image(image, save_timestamp, index, num_items, label, confiden
         weight.encode('utf-8')
     ])
 
+    print("message size: ", len(msg))
+
     try:
         remote_mqttclient = mqtt.Client()
         remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
-        remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg, qos=0, retain=False)
+        ret = remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg, qos=0, retain=False)
     except:
         print("remote mqtt message sending failed\n")
 
@@ -204,7 +220,7 @@ def on_message(client, userdata, msg):
         print("message received!")
         # if we wanted to re-publish this message, something like this should work
 
-        weight = str(msg.payload)
+        weight = msg.payload.decode('utf-8')
 
         with torch.no_grad():
             detect(weight)
