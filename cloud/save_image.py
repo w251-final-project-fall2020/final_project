@@ -17,6 +17,7 @@ dynamodb = boto3.client("dynamodb")
 
 def extractData(payload):
   image_str, save_timestamp, index, num_items, label, confidence, weight = payload.decode('utf-8').split(',')
+  print(image_str)
   image_arr = eval('np.array(' + image_str + ')')
   image_bytes = Image.fromarray(image_arr, 'RGB').tobytes()
   return image_bytes, save_timestamp, index, num_items, label, confidence, weight

@@ -38,6 +38,8 @@ names = None
 
 DELIMITER = ','
 
+np.set_printoptions(threshold=sys.maxsize)
+
 def initialize():
     global model, dataset, names
 
