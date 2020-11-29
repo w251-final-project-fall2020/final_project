@@ -2,17 +2,22 @@ import paho.mqtt.client as mqtt
 from io import BytesIO
 import boto3
 from datetime import datetime
+from PIL import Image
 
 LOCAL_MQTT_HOST = 'mosquitto'
 LOCAL_MQTT_PORT = 1883
-LOCAL_MQTT_TOPIC = 'faces_cloud'
+LOCAL_MQTT_TOPIC = 'food_detector_cloud'
 
-bucket = boto3.resource('s3').Bucket('food-detector-w251')
+bucket = boto3.resource('s3').Bucket('food-detector')
 
 dynamodb = boto3.client("dynamodb")
 
 def extractData(payload):
-  print(payload)
+  image_str, save_timestamp, index, num_items, label, confidence, weight = payload.split(',')
+  image_arr = eval('np.array(' + image_str + ')')
+  image_bytes = Image.fromarray(image_arr, 'RGB').tobytes()
+  return image_bytes, save_timestamp, index, num_items, label, confidence, weight
+  
 
 def on_connect_local(client, userdata, flags, rc):
   print("connected to local broker with rc: " + str(rc))

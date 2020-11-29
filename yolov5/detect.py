@@ -24,7 +24,7 @@ LOCAL_MQTT_HOST='mosquitto'
 LOCAL_MQTT_PORT=1883
 LOCAL_MQTT_TOPIC='weight_detection'
 
-REMOTE_MQTT_HOST='ec2-18-237-58-254.us-west-2.compute.amazonaws.com'
+REMOTE_MQTT_HOST='ec2-3-89-113-213.compute-1.amazonaws.com'
 REMOTE_MQTT_PORT=1883
 REMOTE_MQTT_TOPIC='food_detector_cloud'
 
@@ -118,7 +118,7 @@ def detect(weight, save_img=False):
 
                 x2, x1, y2, y1 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
-                crop_img_str = np.array2string(crop_img)
+                crop_img_str = np.array2string(crop_img, separator=',')
 
                 save_detected_image(
                     crop_img_str, 

@@ -4,4 +4,4 @@ WORKDIR /usr/src/app
 COPY . /usr/src/app
 
 RUN apt update && apt install -y libffi-dev python3-pip curl unzip
-RUN pip3 install -U paho-mqtt boto3
+RUN pip3 install -U paho-mqtt boto3 pillow
