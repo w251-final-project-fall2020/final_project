@@ -36,7 +36,7 @@ model = None
 dataset = None
 names = None
 
-DELIMITER = ','
+DELIMITER = b';'
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -120,10 +120,11 @@ def detect(weight, save_img=False):
 
                 x2, x1, y2, y1 = [int(coord) for coord in xyxy]
                 crop_img = im0[y1:y2, x1:x2]
-                crop_img_str = np.array2string(crop_img, separator=',')
+                rc, png = cv2.imencode('.png', crop_img)
+                image_bytes = png.tobytes()
 
                 save_detected_image(
-                    crop_img_str, 
+                    image_bytes, 
                     save_timestamp, 
                     str(i), str(num_items), 
                     label, 
@@ -180,11 +181,21 @@ def on_connect_local(client, userdata, flags, rc):
     client.subscribe(LOCAL_MQTT_TOPIC)
 
 def save_detected_image(image, save_timestamp, index, num_items, label, confidence, weight):
-    msg = DELIMITER.join([image, save_timestamp, index, num_items, label, confidence, weight])
+    
+    msg = DELIMITER.join([
+        image, 
+        save_timestamp.encode('utf-8'), 
+        index.encode('utf-8'), 
+        num_items.encode('utf-8'), 
+        label.encode('utf-8'), 
+        confidence.encode('utf-8'), 
+        weight.encode('utf-8')
+    ])
+
     try:
         remote_mqttclient = mqtt.Client()
         remote_mqttclient.connect(REMOTE_MQTT_HOST, REMOTE_MQTT_PORT, 60)
-        remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg.payload, qos=0, retain=False)
+        remote_mqttclient.publish(REMOTE_MQTT_TOPIC, payload=msg, qos=0, retain=False)
     except:
         print("remote mqtt message sending failed\n")
 
