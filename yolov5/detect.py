@@ -36,7 +36,7 @@ model = None
 dataset = None
 names = None
 
-DELIMITER = b';'
+DELIMITER = b';;;;;;;;;;'
 
 np.set_printoptions(threshold=sys.maxsize)
 
