@@ -14,15 +14,11 @@ LOCAL_MQTT_TOPIC = 'food_detector_cloud'
 DELIMITER = b';;;;;;;;;;'
 
 bucket = boto3.resource('s3').Bucket('food-detector')
-
-dynamodb = boto3.client("dynamodb")
+table = boto3.resource("dynamodb").Table('food-detector')
 
 def extractData(payload):
   data = payload.split(DELIMITER)
   image = data[0]
-
-  print(data[1:])
-
   save_timestamp, index, num_items, label, confidence, weight = [d.decode('utf-8') for d in data[1:]]
   return image, save_timestamp, index, num_items, label, confidence, weight
 
@@ -49,8 +45,7 @@ def on_message(client, userdata, msg):
       ContentType='image/png'
     )
 
-    response = dynamodb.put_item(
-        TableName='food-detector', 
+    response = table.put_item(
         Item={
             "label": label,
             "confidence": confidence,
